@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useMemo } from 'react';
+import { View, Text, StyleSheet, SectionList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Bot, User, MessageSquare } from 'lucide-react-native';
-import { getChatHistory } from '../services/apiService';
+import { ArrowLeft, Bot, User, MessageSquare, Trash2 } from 'lucide-react-native';
+import { getChatHistory, clearChatHistory } from '../services/apiService';
 
 export default function ChatHistoryScreen({ navigation }: any) {
   const [history, setHistory] = useState<any[]>([]);
@@ -23,6 +23,83 @@ export default function ChatHistoryScreen({ navigation }: any) {
     }
   };
 
+  const handleClearHistory = () => {
+      Alert.alert(
+          "Geçmişi Temizle",
+          "Tüm sohbet geçmişiniz silinecek. Emin misiniz?",
+          [
+              { text: "Vazgeç", style: "cancel" },
+              {
+                  text: "Temizle",
+                  style: "destructive",
+                  onPress: async () => {
+                      setLoading(true);
+                      try {
+                          await clearChatHistory();
+                          setHistory([]);
+                      } catch (error) {
+                          Alert.alert("Hata", "Geçmiş temizlenemedi.");
+                      } finally {
+                          setLoading(false);
+                      }
+                  }
+              }
+          ]
+      );
+  };
+
+  // Mesajları tarihe göre gruplayan fonksiyon
+  const sections = useMemo(() => {
+    if (!history.length) return [];
+
+    const grouped: { title: string; data: any[] }[] = [];
+    let currentTitle = "";
+    let currentData: any[] = [];
+
+    // Veri zaten sunucudan "En Yeniden -> En Eskiye" doğru sıralı geliyor.
+    history.forEach((item) => {
+      const date = new Date(item.created_at);
+      const today = new Date();
+      const yesterday = new Date();
+      yesterday.setDate(today.getDate() - 1);
+
+      let title = date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+      // Tarih başlıklarını belirle (Bugün, Dün kontrolü)
+      const isToday = date.getDate() === today.getDate() &&
+                      date.getMonth() === today.getMonth() &&
+                      date.getFullYear() === today.getFullYear();
+
+      const isYesterday = date.getDate() === yesterday.getDate() &&
+                          date.getMonth() === yesterday.getMonth() &&
+                          date.getFullYear() === yesterday.getFullYear();
+
+      if (isToday) {
+        title = "Bugün";
+      } else if (isYesterday) {
+        title = "Dün";
+      }
+
+      // Yeni bir tarih grubuna geçildiyse
+      if (title !== currentTitle) {
+        if (currentTitle) {
+          grouped.push({ title: currentTitle, data: currentData });
+        }
+        currentTitle = title;
+        currentData = [item];
+      } else {
+        currentData.push(item);
+      }
+    });
+
+    // Son grubu ekle
+    if (currentTitle) {
+      grouped.push({ title: currentTitle, data: currentData });
+    }
+
+    return grouped;
+  }, [history]);
+
   const renderItem = ({ item }: any) => {
     const isUser = item.role === 'user';
     return (
@@ -35,14 +112,22 @@ export default function ChatHistoryScreen({ navigation }: any) {
              <Text style={[styles.msgText, isUser ? styles.userText : styles.aiText]}>{item.message}</Text>
            </View>
            <Text style={styles.dateText}>
-             {new Date(item.created_at).toLocaleDateString('tr-TR', {
-               day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit'
+             {new Date(item.created_at).toLocaleTimeString('tr-TR', {
+               hour: '2-digit', minute:'2-digit'
              })}
            </Text>
         </View>
       </View>
     );
   };
+
+  const renderSectionHeader = ({ section: { title } }: any) => (
+    <View style={styles.sectionHeaderContainer}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionHeaderText}>{title}</Text>
+      </View>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -51,16 +136,25 @@ export default function ChatHistoryScreen({ navigation }: any) {
           <ArrowLeft size={24} color="#374151" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Sohbet Geçmişi</Text>
+
+        {/* Temizleme Butonu */}
+        {history.length > 0 && (
+            <TouchableOpacity onPress={handleClearHistory} style={styles.clearBtn}>
+                <Trash2 size={24} color="#ef4444" />
+            </TouchableOpacity>
+        )}
       </View>
 
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color="#16a34a"/></View>
       ) : (
-        <FlatList
-          data={history}
+        <SectionList
+          sections={sections}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={{ padding: 16 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
           renderItem={renderItem}
+          renderSectionHeader={renderSectionHeader}
+          stickySectionHeadersEnabled={false}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <MessageSquare size={40} color="#d1d5db" />
@@ -78,8 +172,15 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor:'#f3f4f6' },
   backBtn: { marginRight: 16 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#1f2937' },
-  msgRow: { flexDirection: 'row', marginBottom: 20, alignItems: 'flex-start' },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#1f2937', flex: 1 },
+  clearBtn: { padding: 4 },
+
+  // Section Header Stilleri
+  sectionHeaderContainer: { alignItems: 'center', marginVertical: 16 },
+  sectionHeader: { backgroundColor: '#e5e7eb', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
+  sectionHeaderText: { fontSize: 12, fontWeight: '600', color: '#6b7280' },
+
+  msgRow: { flexDirection: 'row', marginBottom: 12, alignItems: 'flex-start' },
   userRow: { flexDirection: 'row-reverse' },
   aiRow: { flexDirection: 'row' },
   avatar: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginHorizontal: 8, marginTop: 4 },

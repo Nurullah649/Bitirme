@@ -10,13 +10,30 @@ export default function ChatScreen({ navigation }: any) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
-      text: "Merhaba! Ben Çiftçi Asistan. Tarlanız, hava durumu veya bitki hastalıkları hakkında bana her şeyi sorabilirsiniz.",
+      text: "Merhaba! Ben Çiftçi Asistan. **Tarlanız**, **hava durumu** veya **bitki hastalıkları** hakkında bana her şeyi sorabilirsiniz.",
       sender: 'ai'
     }
   ]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+
+  // Metin içindeki **bold** işaretlerini işleyen fonksiyon
+  const renderStyledText = (text: string) => {
+    const parts = text.split('**');
+    return parts.map((part, index) => {
+      // Tek sayılar (1, 3, 5...) ** işaretleri arasındaki kısımlardır
+      if (index % 2 === 1) {
+        return (
+          <Text key={index} style={{ fontWeight: 'bold' }}>
+            {part}
+          </Text>
+        );
+      }
+      // Çift sayılar normal metindir
+      return <Text key={index}>{part}</Text>;
+    });
+  };
 
   const handleSend = async () => {
     if (!text.trim()) return;
@@ -34,27 +51,42 @@ export default function ChatScreen({ navigation }: any) {
         // Konum İzni ve Alma (Zaman Aşımlı)
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
+           // Konum alma işlemini de timeout ile sınırla (örneğin 5 saniye)
            const locationPromise = Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-           const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 4000));
+           const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000));
            const location: any = await Promise.race([locationPromise, timeoutPromise]);
-           lat = location.coords.latitude;
-           lon = location.coords.longitude;
+
+           if (location && location.coords) {
+             lat = location.coords.latitude;
+             lon = location.coords.longitude;
+           }
         }
       } catch (e) {
-        console.log("Konum alınamadı, devam ediliyor.");
+        console.log("Konum alınamadı, devam ediliyor:", e);
       }
 
       const response = await sendMessageToAI(userMsg.text, lat, lon);
       const aiMsg: ChatMessage = { id: (Date.now() + 1).toString(), text: response, sender: 'ai' };
       setMessages(prev => [...prev, aiMsg]);
 
-    } catch (e) {
-      const errorMsg: ChatMessage = {
+    } catch (e: any) {
+      console.log("Sohbet Hatası:", e);
+
+      let errorMessage = "Üzgünüm, bir hata oluştu.";
+
+      // Hata mesajını analiz et
+      if (e.message && (e.message.includes('zaman aşımı') || e.message.includes('timeout') || e.message.includes('Network request failed'))) {
+        errorMessage = "Sunucu yanıtı gecikti. İşleminiz arka planda tamamlanmış olabilir. Lütfen **Sohbet Geçmişi** ekranını kontrol edin.";
+      } else {
+        errorMessage = "Sunucuyla bağlantı kurulamadı. Lütfen **internet bağlantınızı** kontrol edin.";
+      }
+
+      const errorMsgObj: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        text: "Üzgünüm, sunucuyla bağlantı kurulamadı.",
+        text: errorMessage,
         sender: 'ai'
       };
-      setMessages(prev => [...prev, errorMsg]);
+      setMessages(prev => [...prev, errorMsgObj]);
     } finally {
       setLoading(false);
     }
@@ -98,7 +130,10 @@ export default function ChatScreen({ navigation }: any) {
                   {item.sender === 'user' ? <User size={18} color="#15803d" /> : <Bot size={18} color="#fff" />}
                 </View>
                 <View style={[styles.bubble, item.sender === 'user' ? styles.userBubble : styles.aiBubble]}>
-                  <Text style={[styles.msgText, item.sender === 'user' ? styles.userText : styles.aiText]}>{item.text}</Text>
+                  {/* renderStyledText fonksiyonu burada kullanılıyor */}
+                  <Text style={[styles.msgText, item.sender === 'user' ? styles.userText : styles.aiText]}>
+                    {renderStyledText(item.text)}
+                  </Text>
                 </View>
               </View>
             )}

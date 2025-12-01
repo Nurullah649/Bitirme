@@ -21,3 +21,12 @@ export interface WeatherData {
   wind: number;
   location: string;
 }
+
+// YENİ: Görev Tipi
+export interface Task {
+  id: number;
+  title: string;
+  date_text: string;
+  status: 'pending' | 'approved' | 'completed';
+  created_at?: string;
+}

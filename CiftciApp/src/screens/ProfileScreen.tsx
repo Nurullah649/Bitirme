@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, User, Mail, MapPin, LogOut, Save } from 'lucide-react-native';
-import { getUserProfile, updateUserProfile } from '../services/apiService';
+import { ArrowLeft, User, LogOut, Save } from 'lucide-react-native';
+import { getUserProfile, updateUserProfile, logoutUser } from '../services/apiService';
 
 export default function ProfileScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
@@ -29,7 +29,12 @@ export default function ProfileScreen({ navigation }: any) {
         location: data.location || '',
       });
     } catch (error) {
-      console.log(error);
+      // Hata durumunda kullanıcıyı login'e atmak yerine,
+      // sadece verinin yüklenemediğini bildirmek daha iyi UX sağlar.
+      // Ancak 401 hatası apiService içinde handle ediliyor ve throw ediliyor.
+      if (error instanceof Error && error.message.includes('Oturum')) {
+         handleLogout();
+      }
     } finally {
       setLoading(false);
     }
@@ -47,8 +52,18 @@ export default function ProfileScreen({ navigation }: any) {
     }
   };
 
-  const handleLogout = () => {
-    navigation.replace('Login');
+  // Güvenli Çıkış İşlemi
+  const handleLogout = async () => {
+    try {
+      await logoutUser(); // Token'ı SecureStore'dan sil
+      // Stack'i sıfırla ve Login'e yönlendir
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
+    } catch (e) {
+      navigation.replace('Login');
+    }
   };
 
   if (loading) {
@@ -83,6 +98,7 @@ export default function ProfileScreen({ navigation }: any) {
                 value={formData.firstName}
                 onChangeText={(t) => setFormData({...formData, firstName: t})}
                 placeholder="Adınız"
+                placeholderTextColor="#9ca3af"
               />
             </View>
             <View style={styles.inputGroup}>
@@ -92,6 +108,7 @@ export default function ProfileScreen({ navigation }: any) {
                 value={formData.lastName}
                 onChangeText={(t) => setFormData({...formData, lastName: t})}
                 placeholder="Soyadınız"
+                placeholderTextColor="#9ca3af"
               />
             </View>
             <View style={styles.inputGroup}>
@@ -101,6 +118,7 @@ export default function ProfileScreen({ navigation }: any) {
                 value={formData.location}
                 onChangeText={(t) => setFormData({...formData, location: t})}
                 placeholder="Örn: Selçuklu, Konya"
+                placeholderTextColor="#9ca3af"
               />
             </View>
              <View style={styles.inputGroup}>

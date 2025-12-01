@@ -1,16 +1,65 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AnalysisResult, WeatherData } from '../types';
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+import { AnalysisResult, WeatherData, Task } from '../types';
 
-// Sunucunun IP Adresi
+// GÜVENLİK NOTU:
+// Gerçek sunucunuzun IP adresini kullanıyoruz.
+// Android emülatör için 10.0.2.2, fiziksel cihaz için bilgisayarınızın yerel IP'si (örn: 192.168.1.X) veya sunucu IP'si gerekir.
+// Şu anki ayar: 78.135.85.128
 const API_BASE_URL = "http://78.135.85.128";
 
-// --- YARDIMCI: TOKEN AL ---
+const TOKEN_KEY = 'auth_token';
+
+// --- GÜVENLİ DEPOLAMA YARDIMCILARI ---
+async function saveToken(token: string) {
+  if (Platform.OS === 'web') {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    await SecureStore.setItemAsync(TOKEN_KEY, token);
+  }
+}
+
+async function getToken(): Promise<string | null> {
+  if (Platform.OS === 'web') {
+    return localStorage.getItem(TOKEN_KEY);
+  }
+  return await SecureStore.getItemAsync(TOKEN_KEY);
+}
+
+export async function removeToken() {
+  if (Platform.OS === 'web') {
+    localStorage.removeItem(TOKEN_KEY);
+  } else {
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+  }
+}
+
+// --- YARDIMCI: HEADER OLUŞTURMA ---
 const getAuthHeaders = async () => {
-  const token = await AsyncStorage.getItem('token');
+  const token = await getToken();
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`
   };
+};
+
+// --- HATA YÖNETİMİ ---
+const handleApiError = async (response: Response, endpointName: string) => {
+  if (!response.ok) {
+    console.log(`API Hatası (${endpointName}):`, response.status);
+    if (response.status === 401) {
+      await removeToken();
+      throw new Error('Oturum süresi doldu.');
+    }
+    const text = await response.text();
+    try {
+        const json = JSON.parse(text);
+        throw new Error(json.detail || `Sunucu hatası: ${response.status}`);
+    } catch (e) {
+        throw new Error(`Sunucu hatası (${response.status})`);
+    }
+  }
+  return response.json();
 };
 
 // --- KİMLİK DOĞRULAMA ---
@@ -20,24 +69,31 @@ export const loginUser = async (email: string, password: string) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.detail || 'Giriş başarısız');
+  const data = await handleApiError(response, 'Login');
+  if (data.access_token) {
+    await saveToken(data.access_token);
   }
-
-  const data = await response.json();
-  await AsyncStorage.setItem('token', data.access_token);
   return data;
 };
 
-// --- PROFİL İŞLEMLERİ ---
+export const logoutUser = async () => {
+  await removeToken();
+};
+
+export const deleteMyAccount = async () => {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/auth/me`, {
+    method: 'DELETE',
+    headers
+  });
+  return await handleApiError(response, 'DeleteAccount');
+};
+
+// --- PROFİL ---
 export const getUserProfile = async () => {
   const headers = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/auth/profile`, { headers });
-
-  if (!response.ok) throw new Error('Profil alınamadı');
-  return await response.json();
+  return await handleApiError(response, 'GetProfile');
 };
 
 export const updateUserProfile = async (data: { firstName: string, lastName: string, location: string }) => {
@@ -51,79 +107,102 @@ export const updateUserProfile = async (data: { firstName: string, lastName: str
       location: data.location
     }),
   });
-
-  if (!response.ok) throw new Error('Profil güncellenemedi');
-  return await response.json();
+  return await handleApiError(response, 'UpdateProfile');
 };
 
-// --- SOHBET GEÇMİŞİ ---
-export const getChatHistory = async () => {
+// --- GÖREV (PLAN) YÖNETİMİ ---
+export const getTasks = async (): Promise<Task[]> => {
   const headers = await getAuthHeaders();
-  const response = await fetch(`${API_BASE_URL}/chat/history`, { headers });
-
-  if (!response.ok) throw new Error('Geçmiş alınamadı');
-  return await response.json();
-};
-
-// --- AKILLI ASİSTAN (CHAT) ---
-export const sendMessageToAI = async (question: string, lat?: number | null, lon?: number | null) => {
-  const headers = await getAuthHeaders();
-
   try {
-    const response = await fetch(`${API_BASE_URL}/ask`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        question,
-        lat: lat || null,
-        lon: lon || null
-      }),
-    });
-
-    if (!response.ok) throw new Error('Cevap alınamadı');
-    return await response.text(); // Backend düz metin dönüyor
+    const response = await fetch(`${API_BASE_URL}/tasks`, { headers });
+    return await handleApiError(response, 'GetTasks');
   } catch (error) {
-    console.error("API Hatası:", error);
-    throw error;
+    console.log("Görev çekme hatası:", error);
+    // Hata durumunda boş dizi dön ki uygulama çökmesin
+    return [];
   }
 };
 
-// --- ANA EKRAN İÇİN HAVA DURUMU ---
+export const updateTaskStatus = async (taskId: number, status: 'approved' | 'completed') => {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ status })
+  });
+  return await handleApiError(response, 'UpdateTask');
+};
+
+export const deleteTask = async (taskId: number) => {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
+    method: 'DELETE',
+    headers
+  });
+  return await handleApiError(response, 'DeleteTask');
+};
+
+// --- SOHBET VE AI ---
+export const getChatHistory = async () => {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/chat/history`, { headers });
+  return await handleApiError(response, 'ChatHistory');
+};
+
+export const clearChatHistory = async () => {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/chat/history`, {
+    method: 'DELETE',
+    headers
+  });
+  return await handleApiError(response, 'ClearChatHistory');
+};
+
+export const sendMessageToAI = async (question: string, lat?: number | null, lon?: number | null) => {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/ask`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      question,
+      lat: lat || null,
+      lon: lon || null
+    })
+  });
+
+  if (!response.ok) {
+      throw new Error(`API Hatası: ${response.status}`);
+  }
+  // Backend PlainTextResponse dönüyor
+  return await response.text();
+};
+
 export const getWeatherData = async (lat: number, lon: number): Promise<WeatherData> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/weather?lat=${lat}&lon=${lon}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    if (!response.ok) throw new Error('Hava durumu alınamadı');
+    const response = await fetch(`${API_BASE_URL}/weather?lat=${lat}&lon=${lon}`);
+    if (!response.ok) throw new Error("Hava durumu alınamadı");
     return await response.json();
   } catch (error) {
-    console.error("Hava Durumu Hatası:", error);
     return {
       temp: 0,
       condition: 'Veri Yok',
       humidity: 0,
       wind: 0,
-      location: 'Konum Bulunamadı'
+      location: 'Hata'
     };
   }
 };
 
-// --- GÖRÜNTÜ ANALİZİ (MOCK) ---
 export const uploadImageForAnalysis = async (imageUri: string): Promise<AnalysisResult> => {
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  const isHealthy = Math.random() > 0.5;
-
+  // Mock implementation for analysis
+  await new Promise(resolve => setTimeout(resolve, 1500));
   return {
     id: Date.now().toString(),
-    imageUri: imageUri,
+    imageUri,
     timestamp: new Date().toISOString(),
-    diseaseName: isHealthy ? "Sağlıklı Bitki" : "Septoria Yaprak Lekesi",
-    confidence: 0.94,
-    recommendation: isHealthy
-      ? "Bitkiniz gayet sağlıklı görünüyor. Düzenli bakıma devam edin."
-      : "Mantar kaynaklı bir hastalık belirtisi. Fungisit uygulaması önerilir.",
-    status: isHealthy ? 'healthy' : 'critical'
+    diseaseName: "Sağlıklı Bitki",
+    confidence: 0.98,
+    recommendation: "Bitkiniz sağlıklı görünüyor.",
+    status: 'healthy'
   };
 };
