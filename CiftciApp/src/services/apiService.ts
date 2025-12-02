@@ -206,3 +206,22 @@ export const uploadImageForAnalysis = async (imageUri: string): Promise<Analysis
     status: 'healthy'
   };
 };
+
+// --- BİLDİRİM (PUSH TOKEN) KAYDETME ---
+export const savePushToken = async (pushToken: string) => {
+  const headers = await getAuthHeaders();
+  try {
+    // Backend endpoint: /auth/save-push-token
+    // Beklenen JSON formatı: { "token": "..." }
+    const response = await fetch(`${API_BASE_URL}/auth/save-push-token`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ token: pushToken }),
+    });
+
+    return await handleApiError(response, 'SavePushToken');
+  } catch (error) {
+    console.log("Token sunucuya kaydedilemedi:", error);
+    // Hata olsa bile uygulamayı durdurmuyoruz
+  }
+};

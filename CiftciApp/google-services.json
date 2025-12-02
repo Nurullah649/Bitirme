@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "863704768078",
+    "project_id": "ciftciapp-8e5bf",
+    "storage_bucket": "ciftciapp-8e5bf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:863704768078:android:c370a2a8daf0184937ad1f",
+        "android_client_info": {
+          "package_name": "com.evie47.CiftciApp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCe4ElfdnuyeWu6EtJ88ITCQqZCCAsAquk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

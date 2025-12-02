@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert, Platform } from 'react-native';
 import { CloudSun, Droplets, Wind, ScanLine, Calendar, AlertTriangle, MapPin, Bell, User } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Location from 'expo-location'; 
-import { getWeatherData } from '../services/apiService';
+import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import Constants from 'expo-constants';
+import { getWeatherData, savePushToken } from '../services/apiService';
 import { WeatherData } from '../types';
 
 export default function DashboardScreen({ navigation }: any) {
@@ -25,13 +28,13 @@ export default function DashboardScreen({ navigation }: any) {
 
       // 2. Konumu Al
       let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      
+
       // 3. API'den Veriyi Çek
       const data = await getWeatherData(
-        location.coords.latitude, 
+        location.coords.latitude,
         location.coords.longitude
       );
-      
+
       setWeather(data);
     } catch (error) {
       console.error("Dashboard Veri Hatası:", error);
@@ -41,8 +44,60 @@ export default function DashboardScreen({ navigation }: any) {
     }
   };
 
+  // Bildirim Token'ını Alıp Backend'e Kaydetme
+  const registerDeviceForPushNotifications = async () => {
+    if (!Device.isDevice) {
+      console.log('Fiziksel cihazda çalışmalısınız (Emulator push desteklemez)');
+      return;
+    }
+
+    try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== 'granted') {
+        console.log('Bildirim izni verilmedi!');
+        return;
+      }
+
+      // Proje ID'sini güvenli şekilde al (app.json'daki ID)
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId ?? "f18467ff-fc40-4c69-9e71-e47056d31b33";
+
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: projectId,
+      });
+
+      const token = tokenData.data;
+      console.log("🔥 CİHAZ TOKENI ALINDI:", token);
+
+      // Backend'e Gönder
+      await savePushToken(token);
+      console.log("✅ Token başarıyla sunucuya kaydedildi.");
+
+    } catch (error) {
+      console.log("Token alma/kaydetme hatası:", error);
+    }
+
+    // Android için kanal ayarı
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+    }
+  };
+
   useEffect(() => {
     fetchDashboardData();
+    // Sayfa açılınca bildirim kaydını da başlat
+    registerDeviceForPushNotifications();
   }, []);
 
   const onRefresh = () => {
