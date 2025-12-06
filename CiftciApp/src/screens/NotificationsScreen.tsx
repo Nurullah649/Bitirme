@@ -28,27 +28,22 @@ export default function NotificationsScreen({ navigation }: any) {
       const nextWeek = new Date();
       nextWeek.setDate(now.getDate() + 7);
 
-      // Filtreleme: Gelecek 7 gün içindeki, Onaylanmış veya Bekleyen görevler
+      // Filtreleme
       const filtered = allTasks.filter(t => {
-        // Tarih formatı: YYYY-MM-DD HH:MM
-        // Eğer format bozuksa veya eski bir kayıt ise try-catch ile geçelim
         try {
-            const taskDate = new Date(t.date_text.replace(' ', 'T')); // ISO formatına yakınlaştırma
-            // Tarih geçerli mi ve gelecek 1 hafta içinde mi?
+            const taskDate = new Date(t.date_text.replace(' ', 'T'));
             return !isNaN(taskDate.getTime()) && taskDate >= now && taskDate <= nextWeek && (t.status === 'approved' || t.status === 'pending');
         } catch (e) {
             return false;
         }
       });
 
-      // Tarihe göre sırala (En yakın en üstte)
+      // Sıralama
       filtered.sort((a, b) => {
           return new Date(a.date_text).getTime() - new Date(b.date_text).getTime();
       });
 
       setUpcomingTasks(filtered);
-
-      // Bulunan bu görevler için hatırlatıcı kur
       scheduleReminders(filtered);
 
     } catch (error) {
@@ -59,17 +54,14 @@ export default function NotificationsScreen({ navigation }: any) {
     }
   };
 
-  // Ara ara bildirim gelmesi için hatırlatıcı kurma
+  // --- DÜZELTİLEN KISIM BURASI ---
   const scheduleReminders = async (tasks: Task[]) => {
-      // Önceki tüm planlanmış bildirimleri temizlemek yerine, sadece yenilerini ekleyebiliriz.
-      // Ancak çakışmayı önlemek için basitçe hepsini iptal edip tekrar kurmak en temizidir (az sayıda görev varsa).
       await Notifications.cancelAllScheduledNotificationsAsync();
 
       for (const task of tasks) {
           try {
               const taskDate = new Date(task.date_text.replace(' ', 'T'));
 
-              // Eğer tarih geçmediyse bildirim kur
               if (taskDate > new Date()) {
                   await Notifications.scheduleNotificationAsync({
                       content: {
@@ -78,7 +70,14 @@ export default function NotificationsScreen({ navigation }: any) {
                           sound: true,
                           data: { taskId: task.id }
                       },
-                      trigger: taskDate, // Tam görev saatinde bildirim
+                      // ESKİ KOD (Hatalı olan):
+                      // trigger: taskDate,
+
+                      // YENİ KOD (Doğru olan):
+                      trigger: {
+                          type: 'date',
+                          date: taskDate
+                      },
                   });
               }
           } catch (e) {
@@ -86,6 +85,7 @@ export default function NotificationsScreen({ navigation }: any) {
           }
       }
   };
+  // --------------------------------
 
   const renderItem = ({ item }: { item: Task }) => (
     <View style={styles.card}>

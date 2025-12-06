@@ -16,11 +16,12 @@ import ChatHistoryScreen from './src/screens/ChatHistoryScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import ScheduleScreen from './src/screens/ScheduleScreen';
 
-// --- 1. BİLDİRİM YÖNETİCİSİ AYARI ---
+// --- 1. BİLDİRİM YÖNETİCİSİ AYARI (GÜNCELLENDİ) ---
 // Uygulama açıkken bildirim gelirse nasıl davranılacağını belirler
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true, // Alert yerine Banner (Üstten çıkan bildirim)
+    shouldShowList: true,   // Bildirim merkezinde görünsün
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
