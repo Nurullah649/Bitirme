@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert, Platform } from 'react-native';
-import { CloudSun, Droplets, Wind, ScanLine, Calendar, AlertTriangle, MapPin, Bell, User } from 'lucide-react-native';
+import { CloudSun, Droplets, Wind, ScanLine, Calendar, AlertTriangle, MapPin, Bell, User, Map } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
@@ -14,27 +14,16 @@ export default function DashboardScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Hava Durumu Verisini Çek
   const fetchDashboardData = async () => {
     try {
-      // 1. Konum İzni
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        // İzin yoksa varsayılan veya boş veri gösterilebilir
         setLoading(false);
         setRefreshing(false);
         return;
       }
-
-      // 2. Konumu Al
       let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-
-      // 3. API'den Veriyi Çek
-      const data = await getWeatherData(
-        location.coords.latitude,
-        location.coords.longitude
-      );
-
+      const data = await getWeatherData(location.coords.latitude, location.coords.longitude);
       setWeather(data);
     } catch (error) {
       console.error("Dashboard Veri Hatası:", error);
@@ -44,46 +33,23 @@ export default function DashboardScreen({ navigation }: any) {
     }
   };
 
-  // Bildirim Token'ını Alıp Backend'e Kaydetme
   const registerDeviceForPushNotifications = async () => {
-    if (!Device.isDevice) {
-      console.log('Fiziksel cihazda çalışmalısınız (Emulator push desteklemez)');
-      return;
-    }
-
+    if (!Device.isDevice) return;
     try {
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
-
       if (existingStatus !== 'granted') {
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
       }
+      if (finalStatus !== 'granted') return;
 
-      if (finalStatus !== 'granted') {
-        console.log('Bildirim izni verilmedi!');
-        return;
-      }
-
-      // Proje ID'sini güvenli şekilde al (app.json'daki ID)
       const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId ?? "f18467ff-fc40-4c69-9e71-e47056d31b33";
-
-      const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: projectId,
-      });
-
-      const token = tokenData.data;
-      console.log("🔥 CİHAZ TOKENI ALINDI:", token);
-
-      // Backend'e Gönder
-      await savePushToken(token);
-      console.log("✅ Token başarıyla sunucuya kaydedildi.");
-
+      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+      await savePushToken(tokenData.data);
     } catch (error) {
-      console.log("Token alma/kaydetme hatası:", error);
+      console.log("Token hatası:", error);
     }
-
-    // Android için kanal ayarı
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
         name: 'default',
@@ -96,7 +62,6 @@ export default function DashboardScreen({ navigation }: any) {
 
   useEffect(() => {
     fetchDashboardData();
-    // Sayfa açılınca bildirim kaydını da başlat
     registerDeviceForPushNotifications();
   }, []);
 
@@ -107,11 +72,9 @@ export default function DashboardScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={{ paddingBottom: 20 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#16a34a"]} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#16a34a"]} />}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -121,8 +84,6 @@ export default function DashboardScreen({ navigation }: any) {
               {new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })}
             </Text>
           </View>
-          
-          {/* Sağ Üst Butonlar */}
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
               <Bell size={24} color="#374151" />
@@ -133,7 +94,7 @@ export default function DashboardScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Hava Durumu Kartı */}
+        {/* Hava Durumu */}
         <View style={styles.weatherCard}>
           {loading ? (
             <ActivityIndicator size="large" color="#fff" style={{ padding: 20 }} />
@@ -147,9 +108,7 @@ export default function DashboardScreen({ navigation }: any) {
                 <Text style={styles.weatherTemp}>{weather?.temp ?? "--"}°C</Text>
                 <Text style={styles.weatherCond}>{weather?.condition || "Yükleniyor..."}</Text>
               </View>
-              
               <CloudSun size={64} color="#bbf7d0" style={styles.weatherIcon} />
-              
               <View style={styles.weatherStats}>
                 <View style={styles.statItem}>
                   <Droplets size={16} color="#bbf7d0" />
@@ -181,10 +140,17 @@ export default function DashboardScreen({ navigation }: any) {
               </View>
               <Text style={styles.actionText}>Planlama</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('Map')}>
+              <View style={[styles.iconBox, { backgroundColor: '#fef3c7' }]}>
+                <Map size={28} color="#d97706" />
+              </View>
+              <Text style={styles.actionText}>Harita</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Uyarı Kartı */}
+        {/* İpucu */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Günün İpucu</Text>
           <View style={styles.alertCard}>
@@ -192,8 +158,8 @@ export default function DashboardScreen({ navigation }: any) {
             <View style={styles.alertContent}>
               <Text style={styles.alertTitle}>Durum Analizi</Text>
               <Text style={styles.alertDesc}>
-                {weather && weather.temp > 28 
-                  ? "Sıcaklık yüksek seyrediyor. Sulama sıklığını artırmayı değerlendirin." 
+                {weather && weather.temp > 28
+                  ? "Sıcaklık yüksek seyrediyor. Sulama sıklığını artırmayı değerlendirin."
                   : weather && weather.temp < 5
                   ? "Don riski olabilir. Hassas bitkilerinizi korumaya alın."
                   : "Hava koşulları mevsim normallerinde. Düzenli bakıma devam edebilirsiniz."}
@@ -211,8 +177,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', padding: 20, backgroundColor: '#fff', paddingBottom: 12 },
   headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#111' },
   dateText: { fontSize: 14, color: '#6b7280', marginTop: 4, textTransform: 'capitalize' },
-  
-  weatherCard: { margin: 20, padding: 24, backgroundColor: '#16a34a', borderRadius: 24, position: 'relative', overflow: 'hidden', elevation: 4, shadowColor: "#16a34a", shadowOpacity: 0.3, shadowRadius: 8 },
+  weatherCard: { margin: 20, padding: 24, backgroundColor: '#16a34a', borderRadius: 24, position: 'relative', overflow: 'hidden', elevation: 4 },
   weatherInfo: { marginBottom: 20, zIndex: 2 },
   weatherLoc: { color: '#dcfce7', fontSize: 14, fontWeight: '500' },
   weatherTemp: { color: '#fff', fontSize: 48, fontWeight: 'bold' },
@@ -221,14 +186,12 @@ const styles = StyleSheet.create({
   weatherStats: { flexDirection: 'row', gap: 16, marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.2)' },
   statItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statText: { color: '#fff', fontSize: 14, fontWeight: '500' },
-  
   section: { paddingHorizontal: 20, marginBottom: 24 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#1f2937', marginBottom: 12 },
-  actionGrid: { flexDirection: 'row', gap: 12 },
-  actionCard: { flex: 1, backgroundColor: '#fff', padding: 16, borderRadius: 16, alignItems: 'center', gap: 12, elevation: 2 },
-  iconBox: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center' },
-  actionText: { fontWeight: '600', color: '#374151' },
-  
+  actionGrid: { flexDirection: 'row', gap: 8 },
+  actionCard: { flex: 1, backgroundColor: '#fff', padding: 12, borderRadius: 16, alignItems: 'center', gap: 8, elevation: 2 },
+  iconBox: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
+  actionText: { fontWeight: '600', color: '#374151', fontSize: 12, textAlign: 'center' },
   alertCard: { flexDirection: 'row', backgroundColor: '#fff7ed', padding: 16, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: '#fb923c', gap: 12, elevation: 1 },
   alertContent: { flex: 1 },
   alertTitle: { color: '#9a3412', fontWeight: 'bold', marginBottom: 4 },

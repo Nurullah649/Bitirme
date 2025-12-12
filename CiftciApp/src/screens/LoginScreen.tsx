@@ -24,7 +24,6 @@ export default function LoginScreen({ navigation }: any) {
   const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
-    // Temel istemci tarafı doğrulama
     if (!email || !password) {
       Alert.alert("Uyarı", "Lütfen e-posta ve şifrenizi giriniz.");
       return;
@@ -33,15 +32,11 @@ export default function LoginScreen({ navigation }: any) {
     setLoading(true);
     try {
       await loginUser(email, password);
-      // Başarılı girişte stack'i sıfırlayarak ana sayfaya git
-      // Bu, kullanıcının 'Geri' tuşuyla tekrar login ekranına dönmesini engeller
       navigation.reset({
         index: 0,
         routes: [{ name: 'Main' }],
       });
     } catch (error: any) {
-      // Güvenlik: Kullanıcıya teknik detay (stack trace) gösterme
-      // Sadece anlaşılır genel bir mesaj ver.
       const message = error.message === 'Network request failed'
         ? 'Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin.'
         : 'Giriş yapılamadı. E-posta veya şifre hatalı olabilir.';
@@ -120,6 +115,13 @@ export default function LoginScreen({ navigation }: any) {
                   )}
                 </TouchableOpacity>
               </View>
+
+              <View style={styles.registerRow}>
+                <Text style={styles.registerText}>Hesabınız yok mu? </Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+                    <Text style={styles.registerLink}>Hemen Kayıt Olun</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
           </ScrollView>
@@ -184,5 +186,19 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     backgroundColor: '#86efac',
   },
-  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
+  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  registerRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 24
+  },
+  registerText: {
+    color: '#6b7280',
+    fontSize: 15
+  },
+  registerLink: {
+    color: '#16a34a',
+    fontWeight: 'bold',
+    fontSize: 15
+  }
 });

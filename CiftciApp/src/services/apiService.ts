@@ -2,10 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { AnalysisResult, WeatherData, Task } from '../types';
 
-// GÜVENLİK NOTU:
-// Gerçek sunucunuzun IP adresini kullanıyoruz.
-// Android emülatör için 10.0.2.2, fiziksel cihaz için bilgisayarınızın yerel IP'si (örn: 192.168.1.X) veya sunucu IP'si gerekir.
-// Şu anki ayar: 78.135.85.128
+// GÜVENLİK NOTU: Sunucu IP adresini buraya girin.
 const API_BASE_URL = "http://78.135.85.128";
 
 const TOKEN_KEY = 'auth_token';
@@ -76,6 +73,20 @@ export const loginUser = async (email: string, password: string) => {
   return data;
 };
 
+export const registerUser = async (data: { email: string; password: string; firstName?: string; lastName?: string }) => {
+  const response = await fetch(`${API_BASE_URL}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: data.email,
+      password: data.password,
+      first_name: data.firstName,
+      last_name: data.lastName
+    }),
+  });
+  return await handleApiError(response, 'Register');
+};
+
 export const logoutUser = async () => {
   await removeToken();
 };
@@ -118,7 +129,6 @@ export const getTasks = async (): Promise<Task[]> => {
     return await handleApiError(response, 'GetTasks');
   } catch (error) {
     console.log("Görev çekme hatası:", error);
-    // Hata durumunda boş dizi dön ki uygulama çökmesin
     return [];
   }
 };
@@ -173,7 +183,6 @@ export const sendMessageToAI = async (question: string, lat?: number | null, lon
   if (!response.ok) {
       throw new Error(`API Hatası: ${response.status}`);
   }
-  // Backend PlainTextResponse dönüyor
   return await response.text();
 };
 
@@ -194,7 +203,6 @@ export const getWeatherData = async (lat: number, lon: number): Promise<WeatherD
 };
 
 export const uploadImageForAnalysis = async (imageUri: string): Promise<AnalysisResult> => {
-  // Mock implementation for analysis
   await new Promise(resolve => setTimeout(resolve, 1500));
   return {
     id: Date.now().toString(),
@@ -207,21 +215,33 @@ export const uploadImageForAnalysis = async (imageUri: string): Promise<Analysis
   };
 };
 
-// --- BİLDİRİM (PUSH TOKEN) KAYDETME ---
+// --- BİLDİRİM (PUSH TOKEN) ---
 export const savePushToken = async (pushToken: string) => {
   const headers = await getAuthHeaders();
   try {
-    // Backend endpoint: /auth/save-push-token
-    // Beklenen JSON formatı: { "token": "..." }
     const response = await fetch(`${API_BASE_URL}/auth/save-push-token`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ token: pushToken }),
     });
-
     return await handleApiError(response, 'SavePushToken');
   } catch (error) {
     console.log("Token sunucuya kaydedilemedi:", error);
-    // Hata olsa bile uygulamayı durdurmuyoruz
   }
+};
+
+// --- HARİTA SERVİSİ ---
+export const getMapHtml = async (city: string) => {
+  const response = await fetch(`${API_BASE_URL}/tools/generate-map`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ city }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Harita oluşturulamadı.");
+  }
+  return await response.text();
 };
