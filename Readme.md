@@ -46,12 +46,15 @@ Proje, modern yazılım mimarisi prensiplerine uygun olarak **Client-Server** ya
 * **Yöntem:** RAG (Retrieval-Augmented Generation) desteği ile güncel tarım verilerine erişim.
 
 ---
+### 🧠 Yapay Zeka Modeli Hakkında
+Bu projede kullanılan yapay zeka asistanı, genel amaçlı bir sohbet botu değildir. Aşağıdaki süreçlerden geçirilmiştir:
+* ** Veri Toplama: Ziraat mühendisliği kaynakları, tarım bakanlığı verileri ve akademik makalelerden oluşan bir veri seti derlendi.
 
-## ⚙️ Kurulum ve Çalıştırma
+* ** Fine-Tuning: Açık kaynaklı bir temel model (Base Model), bu veri seti ile eğitilerek tarımsal terminolojiye hakim hale getirildi.
 
-Projeyi yerel ortamınızda çalıştırmak için aşağıdaki adımları izleyin.
+* ** Optimizasyon: Mobil cihazlardan gelen sorgulara hızlı yanıt verebilmesi için API katmanında optimizasyonlar yapıldı.
 
 ### Ön Gereksinimler
 * Node.js & npm/yarn
 * Python 3.8+
-* PostgreSQL
+* MySQL
