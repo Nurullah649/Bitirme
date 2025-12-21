@@ -37,8 +37,7 @@ Proje, modern yazılım mimarisi prensiplerine uygun olarak **Client-Server** ya
 ### Backend (Server)
 * **Dil:** Python
 * **Framework:** Flask (RESTful API)
-* **Veritabanı:** PostgreSQL
-* **ORM:** SQLAlchemy
+* **Veritabanı:** MySQL
 * **Authentication:** JWT (JSON Web Tokens)
 
 ### Yapay Zeka (AI Core)
