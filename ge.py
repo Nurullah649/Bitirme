@@ -3,28 +3,32 @@ import random
 from datetime import date, timedelta
 
 # --- AYARLAR ---
-HEDEFLENEN_SATIR_SAYISI = 500
-CIKTI_DOSYASI = "grid_urfa.csv"
+# Veriyi büyütmek için satır sayısını ciddi oranda artırdık.
+HEDEFLENEN_SATIR_SAYISI = 50000
+CIKTI_DOSYASI = "grid_urfa_genis.csv"
 
-# Şanlıurfa için yaklaşık koordinat sınırları (dışarı taşsa bile
-# veri_topla.py içindeki filtre bunu yakalayacaktır)
-LAT_MIN, LAT_MAX = 36.80, 37.80
-LON_MIN, LON_MAX = 37.90, 39.40
+# Şanlıurfa Genişletilmiş Koordinat Sınırları
+# Batı: Birecik (37.80), Doğu: Ceylanpınar (40.25)
+# Güney: Akçakale/Harran (36.65), Kuzey: Siverek (37.95)
+LAT_MIN, LAT_MAX = 36.65, 37.95
+LON_MIN, LON_MAX = 37.80, 40.25
 
-# Tarih aralığı (NASA POWER'ın geçmiş veriye ihtiyacı var,
-# WeatherAPI zaten 'current' kullanıyor)
-TARIH_BASLANGIC = date(2024, 5, 1)
-TARIH_BITIS = date(2025, 11, 30)
+# Tarih aralığını da genişlettik (Son 5 yılın verisi)
+# Modelin mevsimsel döngüleri (kurak yıl, yağışlı yıl) iyi öğrenmesi için.
+TARIH_BASLANGIC = date(2020, 1, 1)
+TARIH_BITIS = date(2025, 12, 30)
 
-# veri_topla.py içindeki CROPS sözlüğünden alınan bitkiler
-# Domates ve Biber'i de ekledim ki veri çeşitliliği artsın.
+# Ürün çeşitliliği
 BITKILER = [
     "Buğday",
     "Mısır",
     "Pamuk",
     "Domates",
     "Biber",
-    "Antep Fıstığı"
+    "Antep Fıstığı",
+    "Mercimek",  # Kışlık ürün olarak eklendi
+    "Arpa",  # Kıraç alanlar için
+    "Nohut"  # Alternatif ürün
 ]
 
 
@@ -39,10 +43,12 @@ def random_date(start, end):
 
 
 def main():
-    print(f"'{CIKTI_DOSYASI}' dosyası {HEDEFLENEN_SATIR_SAYISI} satır ile oluşturuluyor...")
+    print(f"Büyük Veri Seti Oluşturuluyor: '{CIKTI_DOSYASI}'")
+    print(f"Hedef: {HEDEFLENEN_SATIR_SAYISI} satır | Kapsam: Tüm Şanlıurfa İli")
 
     rows = []
-    for _ in range(HEDEFLENEN_SATIR_SAYISI):
+    # İlerleme çubuğu benzeri bir çıktı için
+    for i in range(HEDEFLENEN_SATIR_SAYISI):
         lat = round(random.uniform(LAT_MIN, LAT_MAX), 5)
         lon = round(random.uniform(LON_MIN, LON_MAX), 5)
         d = random_date(TARIH_BASLANGIC, TARIH_BITIS)
@@ -55,6 +61,9 @@ def main():
             "plant": plant
         })
 
+        if (i + 1) % 5000 == 0:
+            print(f"-> {i + 1} satır üretildi...")
+
     # CSV dosyasına yaz
     try:
         with open(CIKTI_DOSYASI, 'w', newline='', encoding='utf-8') as f:
@@ -64,8 +73,8 @@ def main():
             writer.writeheader()
             writer.writerows(rows)
 
-        print(f"Başarılı: '{CIKTI_DOSYASI}' dosyası {len(rows)} satır ile güncellendi.")
-        print("Şimdi 'veri_topla.py' betiğini çalıştırabilirsiniz.")
+        print(f"\nİŞLEM BAŞARILI: '{CIKTI_DOSYASI}' dosyası {len(rows)} satır ile hazır.")
+        print("İpucu: Bu dosyayı 'dataset_olusturucu.py' içinde GRID_DOSYASI_PATH olarak tanımlamayı unutmayın.")
 
     except IOError as e:
         print(f"Hata: Dosya yazılırken bir sorun oluştu: {e}")

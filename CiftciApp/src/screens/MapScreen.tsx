@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
-import { ArrowLeft, Search, Map as MapIcon } from 'lucide-react-native';
+import { ArrowLeft, Search, Map as MapIcon, Locate } from 'lucide-react-native';
+import * as Location from 'expo-location'; // Konum servisi eklendi
 import { getMapHtml, getUserProfile } from '../services/apiService';
 
 export default function MapScreen({ navigation }: any) {
@@ -41,6 +42,46 @@ export default function MapScreen({ navigation }: any) {
     }
   };
 
+  // --- YENİ EKLENEN FONKSİYON: Konumumu Kullan ---
+  const handleCurrentLocation = async () => {
+    setLoading(true);
+    try {
+      // 1. İzin İste
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('İzin Reddedildi', 'Konumunuzu bulabilmek için izin vermeniz gerekiyor.');
+        setLoading(false);
+        return;
+      }
+
+      // 2. Koordinatları Al
+      let location = await Location.getCurrentPositionAsync({});
+
+      // 3. Koordinatı Adrese Çevir (Reverse Geocoding)
+      let address = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude
+      });
+
+      if (address && address.length > 0) {
+        const place = address[0];
+        // Öncelik: İlçe (subregion) -> Şehir (city) -> Bölge (region)
+        const locationName = place.subregion || place.city || place.region;
+
+        if (locationName) {
+            setCity(locationName); // Input'a yaz
+            fetchMap(locationName); // Haritayı getir
+        } else {
+            Alert.alert('Hata', 'Bulunduğunuz konumun ismi tespit edilemedi.');
+            setLoading(false);
+        }
+      }
+    } catch (error) {
+      Alert.alert('Hata', 'Konum alınırken bir sorun oluştu. GPS servisinizi kontrol edin.');
+      setLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -54,12 +95,23 @@ export default function MapScreen({ navigation }: any) {
         <View style={styles.inputWrapper}>
           <TextInput
             style={styles.input}
-            placeholder="Şehir veya İlçe Girin (Örn: Konya)"
+            placeholder="Şehir/İlçe (Örn: Konya)"
             value={city}
             onChangeText={setCity}
             placeholderTextColor="#9ca3af"
           />
         </View>
+
+        {/* YENİ BUTON: Konumumu Kullan */}
+        <TouchableOpacity
+          style={[styles.searchBtn, { backgroundColor: '#3b82f6' }]} // Mavi renk
+          onPress={handleCurrentLocation}
+          disabled={loading}
+        >
+          {loading ? <ActivityIndicator color="#fff" size="small" /> : <Locate size={20} color="#fff" />}
+        </TouchableOpacity>
+
+        {/* Mevcut Arama Butonu */}
         <TouchableOpacity
           style={styles.searchBtn}
           onPress={() => fetchMap(city)}
@@ -92,7 +144,7 @@ export default function MapScreen({ navigation }: any) {
               Görüntülemek istediğiniz konumu yukarıya yazın.
             </Text>
             <Text style={styles.subText}>
-                Uydu görüntüleri ve toprak analizi için bölge seçimi yapın.
+                veya "Konum" butonuna basarak olduğunuz yeri taratın.
             </Text>
           </View>
         )}
