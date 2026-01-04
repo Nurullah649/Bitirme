@@ -1,0 +1,14 @@
+# EAS Build için gereksiz klasörler
+node_modules/
+.expo/
+.git/
+dist/
+web-build/
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# Eğer projen "Managed Workflow" ise (android klasörünü sen elle oluşturmadıysan) bunları da ekle:
+android/
+ios/
