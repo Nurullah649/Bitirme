@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import { AnalysisResult, WeatherData, Task } from '../types';
 
 // GÜVENLİK NOTU: Sunucu IP adresini buraya girin.
-const API_BASE_URL = "http://78.135.85.128";
+const API_BASE_URL = "https://ciftciapp.nurullahkurnaz.com";
 
 const TOKEN_KEY = 'auth_token';
 
